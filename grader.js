@@ -1,30 +1,9 @@
 #!/usr/bin/env node
-/*
-Automatically grade files for the presence of specified HTML tags / 
-attributes.
-Uses commander.js and cheerio. Teaches command line application development
-and basic DOM parsing.
-
-References:
-
- + cheerio
-   - https://github.com/MatthewMueller/cheerio
-   - http://encosia.com/cheerio-faster-windows-friendly-alternative-jsdom/
-   - http://maxogden.com/scraping-with-node.html
-
- + commander.js
-   - https://github.com/visionmedia/commander.js
-   - http://tjholowaychuk.com/post/9103188408/commander-js-nodejs-command-line-interfaces-made-easy
-
- + JSON
-   - http://en.wikipedia.org/wiki/JSON
-   - https://developer.mozilla.org/en-US/docs/JSON
-   - https://developer.mozilla.org/en-US/docs/JSON#JSON_in_Firefox_2
-*/
-
-var fs = require('fs');
+var fs = require( 'fs' );
 var program = require('commander');
 var cheerio = require('cheerio');
+var rest = require( 'restler' );
+var URL_DEFAULT = "123";
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
@@ -34,9 +13,19 @@ var assertFileExists = function(infile) {
         console.log("%s does not exist. Exiting.", instr);
         process.exit(1); // http://nodejs.org/api/process.html#process_process_exit_code
     }
-    //efw
-    console.log( "*** instr: " + instr );
     return instr;
+};
+
+var cheerioURL = function( url ) {
+    var retVal = rest.get( url ).on( 'complete', function( result ) {
+        fs.writeFileSync( outfile, result );
+        var checkJson = checkURL(program.url, program.checks);
+        var outJson = JSON.stringify(checkJson, null, 4);
+        console.log(outJson);
+    });
+    console.log( '*** retVal: ' + retVal.toString() );
+    //return cheerio.load( rest.get( url ) );
+    return cheerio.load( retVal );
 };
 
 var cheerioHtmlFile = function(htmlfile) {
@@ -47,8 +36,8 @@ var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
-var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
+var checkHtmlFile = function( htmlfile, checksfile ) {
+    $ = cheerioHtmlFile( htmlfile );
     var checks = loadChecks(checksfile).sort();
     var out = {};
     for(var ii in checks) {
@@ -68,11 +57,23 @@ if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+        .option('-u, --url <url>', 'URL to page to test', String, URL_DEFAULT)
         .parse(process.argv);
+    // call restler function...
+if ( program.url != null ) {
+   var retVal = rest.get( program.url ).on( 'complete', function( result ) {
+        fs.writeFileSync( 'new_html.html', result );
+        var checkJson = checkHtmlFile('new_html.html', program.checks);
+        var outJson = JSON.stringify(checkJson, null, 4);
+        console.log(outJson);
+    });
+} else {
     var checkJson = checkHtmlFile(program.file, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
-} else {
-    exports.checkHtmlFile = checkHtmlFile;
 }
 
+} else {
+    console.log( "*** in else" );
+    exports.checkHtmlFile = checkHtmlFile;
+}
